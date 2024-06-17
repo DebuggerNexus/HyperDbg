@@ -115,6 +115,32 @@ DispatchEventCpuid(VIRTUAL_MACHINE_STATE * VCpu)
     UINT64                                    Context;
     VMM_CALLBACK_TRIGGERING_EVENT_STATUS_TYPE EventTriggerResult;
     BOOLEAN                                   PostEventTriggerReq = FALSE;
+    RFLAGS                                    Rflags              = {0};
+
+    //
+    // Check if the trap flag is set, if yes then we should not proceed to the next instruction
+    //
+    Rflags.AsUInt = HvGetRflags();
+    if (Rflags.TrapFlag)
+    {
+        LogInfo("Trap flag is set on CPUID instructions, usually it is an indication of an anti-debugging method, "
+                "HyperDbg will try to handle it by inject a trap after CPUID");
+
+        //
+        // Inject a trap #DB after CPUID
+        //
+        EventInjectDebugBreakpoint();
+
+        //
+        // Remove the trap flag
+        //
+        Rflags.TrapFlag = 0;
+
+        //
+        // Write the new RFLAGS
+        //
+        HvSetRflags(Rflags.AsUInt);
+    }
 
     //
     // Check if attaching is for command dispatching in user debugger
